@@ -113,6 +113,45 @@
 
 
 		}
+		
+		function DSLTask(mainTask){
+			 this.dependsOn = {num:0 , _:[];
+			 this.task =task;
+			 this.isFinish =false;
+			 this.id = mainTask._id ||  mainTask._id= new Date().getTime(); 
+		}
+		DSLTask.prototype={
+			 cache:{ },
+			 get:function(task){
+			 	 var  existDslTask = this.cache[task.id];
+			 	 if(!existDslTask){
+					 existDslTask = this.cache[task.id] = new DSLTask(task);
+			 	 }
+			 	 return existDslTask;
+			 }
+			 run:function(){
+			 	var self = this , dependsOn = this.dependsOn;
+			 	if(dependsOn.num > 0){
+			 		for( var i = 0 ; i < dependsOn.num ; i++){
+			 			dependsOn[i].on("exec",function(){
+			 				  self.dependsOn.num -- ; 
+			 				  if(self.dependsOn.num == 0){
+			 				  	  self.task.exec();
+			 				  }	
+			 			});	
+			 			dependsOn[i].run();
+			 		}
+			 	}
+
+			 },
+			 after:function(task){
+			 	   this.dependsOn.push(new DSLTask(tas))
+			 },
+			 before:function(task){
+
+			 }
+		}
+
 
 
 	var  t1 = new Task(1);
