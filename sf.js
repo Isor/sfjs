@@ -35,17 +35,86 @@
 				CACHE: {},
 				root : "" 			
 		}; 
+
+
+		/*事件Event 对象 */
+
+		function Entity(func,num){
+		this.func = func;
+		this.num =  (num === undefined) ? -1 : num ;
+		this.time = new Date();
+		this.isExpired= function(){
+			return this.num == 0;
+		}
+		this.exec =function(){
+			if(!this.isExpired()){
+				func.call();
+				if(this.num > 0){
+					this.num -= 1;
+				}
+			}
+		}
+	}
+
+	
+	function Event(){
+	
+		this.eventSource={};
+	}
+	Event.prototype ={
+		on:function(key,func,num){
+			
+			if(!$x.isFunc(func)) { throw "func not a  function" ;}
+			var ls = this.eventSource[key] || (this.eventSource[key]=[]);
+				ls.push(new Entity(func,num));
+		},
+		fire:function(key){
+			console.log(this.eventSource)
+			var ls = this.eventSource[key] || [];
+			
+			for(var i = 0 ; i<ls.length; i++ ){
+				//console.log(ls[i]);
+				 var entity = ls[i];
+					 entity.exec();
+			} 
+			this.flush(key);
+			
+		},
+		one:function(key,func){
+			console.log(key);
+			this.on(key,func,1);
+		},
+		flush:function(key){
+			var ls = this.eventSource[key] || [];
+			var survivors = [];
+			for(var i =0 ; i < ls.length;  i++ ){
+				var entity = ls[i];
+				if(!entity.isExpired()){
+					survivors.push(entity);
+				}
+			}
+			this.eventSource[key] = survivors;
+		}
+					
+	}
+
+	
+
+
+
 		/* 模块状态 : 存在错误, 未加载, 加载中, 已加载, 已执行 */
 		var STATUS ={ ERROR:0, UNLOAD:1, LOADING:2,LOADED:3 ,EXECUTED:4};
 		var EVENTS ={ LOADED :"0", EXECUTED:"1"}; 
 		/* 模块 */
 		function Module(id,src){
+
 			this.id = id; 
 			this.src =src;
 			this.func = null;
 			this.status = STATUS.UNLOAD; 
-			this.listener ={};
 			this.depsnum = 0;
+			this.eventbus =  new Event();
+			this._deps = []; 
 		}
 		
 		
@@ -92,6 +161,7 @@
 					 	 var modules = e.modules;
 					 	 for(var i = 0 ; i< modules.length; i++){
 					 	 	self.afterExec(modules[i]);
+
 					 	 }
 					 	 for(var i = 0 ; i< modules.length; i++){
 					 	 	modules[i].exec();
@@ -109,6 +179,7 @@
 			afterExec:function(module){
 					var self = this;
 					this.depsnum += 1;
+					this.deps.push(module);
 					
 					module.on(EVENTS.EXECUTED,function(){
 						self.depsnum -- ;
@@ -119,16 +190,17 @@
 			},
 
 			on:function(key,func){
-				var ls = this.listener[key] || (this.listener[key] =[] );
+				/*
+				    the old code ,implements a eventsource at self.
+				    and change to a sf-event.js Event Object
+					var ls = this.listener[key] || (this.listener[key] =[] );
 					ls.push(func);	
+
+				*/
+				this.eventbus.one(key,func);
 			},
 			emit:function(key){
-				var ls = this.listener[key] || [];
-				this.listener[key] = [];
-				for(var i = 0 ; i < ls.length; i++ ){
-					ls[i].call();
-				}
-
+				this.eventbus.fire(key);
 			}	
 
 
@@ -164,8 +236,9 @@
 
 		function $run(src){
 			
-			var main = $x.get(src);
-				main.exec();
+			var main = new Module("main",src);
+			main.exec();
+			
 			
 		}
 
