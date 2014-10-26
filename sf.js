@@ -27,11 +27,23 @@
 					return $_tos.call(obj) === "[object String]";
 				},			
 				get:function(src){ 
-							if(!$x.CACHE[src]){ 
-								$x.CACHE[src] = new Module(src,src);
+							var meta = module_meta(src);							
+							
+							if(!$x.CACHE[meta.id]){ 
+								$x.CACHE[meta.id] = new Module(meta.id,meta.src);
 							} 
-							return $x.CACHE[src];
+							return $x.CACHE[meta.id];
 				},
+				libId:function(src){
+						var _jsIndex = src.indexOf(".js");
+						if(_jsIndex !=-1){
+							return src.substring(0,_jsIndex);
+						}
+						return src;
+				},
+
+
+
 				CACHE: {},
 				root : "" 			
 		}; 
@@ -56,7 +68,7 @@
 		}
 	}
 
-	
+
 	function Event(){
 	
 		this.eventSource={};
@@ -81,7 +93,7 @@
 			
 		},
 		one:function(key,func){
-			console.log(key);
+		
 			this.on(key,func,1);
 		},
 		flush:function(key){
@@ -104,13 +116,22 @@
 
 		/* 模块状态 : 存在错误, 未加载, 加载中, 已加载, 已执行 */
 		var STATUS ={ ERROR:0, UNLOAD:1, LOADING:2,LOADED:3 ,EXECUTED:4};
-		var EVENTS ={ LOADED :"0", EXECUTED:"1"}; 
+		var EVENTS ={ LOADED :"loaded", EXECUTED:"execed"}; 
+		var CURRENT_MODULE = null;
+
+		function module_meta(src){
+			var indexOfPointJs=src.indexOf(".js");
+			return {
+				id: (indexOfPointJs != -1 ? src.substring(0,indexOfPointJs) : src),
+				src: (indexOfPointJs !=-1  ? src : src+".js")
+			}
+		}
 		/* 模块 */
-		function Module(id,src){
+		function Module(id,src,func){
 
 			this.id = id; 
 			this.src =src;
-			this.func = null;
+			this.func = func || null;
 			this.status = STATUS.UNLOAD; 
 			this.depsnum = 0;
 			this.eventbus =  new Event();
@@ -121,7 +142,7 @@
 		Module.prototype ={
 
 			load:function(callback){ // for some reason , it just invock by self.
-				var self = this;		
+				var self = this;	
 					
 				this.on(EVENTS.LOADED,callback);				
 				if(this.status >= STATUS.LOADING){ return ;}
@@ -147,7 +168,7 @@
 					return;
 				}
 				if(this.status == STATUS.EXECUTED){
-					this.emit(EVENTS.EXECUTED);
+					//this.emit(EVENTS.EXECUTED);
 					return;
 				}
 				try{
@@ -159,11 +180,14 @@
 				
 					 if(e instanceof ModuleDepException){
 					 	 var modules = e.modules;
-					 	 for(var i = 0 ; i< modules.length; i++){
-					 	 	self.afterExec(modules[i]);
-
+					 	 var deps = [] ; 
+					 	 for(var i = 0 ; i< modules.length; i++){	
+					 	 	if(modules[i].id  != this.id ){	 // 屏蔽对自己的依赖
+					 	 		self.afterExec(modules[i]);
+					 	 		deps.push(modules[i]);
+					 	 	}
 					 	 }
-					 	 for(var i = 0 ; i< modules.length; i++){
+					 	 for(var i = 0 ; i< deps.length; i++){
 					 	 	modules[i].exec();
 					 	 }
 
@@ -179,7 +203,7 @@
 			afterExec:function(module){
 					var self = this;
 					this.depsnum += 1;
-					this.deps.push(module);
+					this._deps.push(module);
 					
 					module.on(EVENTS.EXECUTED,function(){
 						self.depsnum -- ;
@@ -200,6 +224,7 @@
 				this.eventbus.one(key,func);
 			},
 			emit:function(key){
+				console.log( this.id);
 				this.eventbus.fire(key);
 			}	
 
@@ -215,10 +240,26 @@
 				$x.eax_func = func;
 
 		}
+		function def0(src,func){
+				var meta = module_meta(src);
+				var id = meta.id, src = meta.src;
+				if($x.CACHE[id]){
+					throw "the lib#"+id+" has exists. please check it.";
+				}
+				var newModule  = new Module(id, src,func);
+					newModule.status = STATUS.LOADED;
+				$x.CACHE[id] = newModule;
+		}
 
 		function $import(src){
 			
-			var deps = $x.isArray(src)  ? src : [src];
+			var src = $x.isArray(src)  ? src : [src];
+			var deps= [];
+			for(var i = 0 ; i< src.length; i ++){
+				var meta = module_meta(src[i]);
+				deps.push(meta.id);
+			}
+
 			var unExecedDepsModule = [] ;
 			for(var i = 0 ; i < deps.length ; i++){
 				var module = $x.get(deps[i]);
@@ -236,9 +277,12 @@
 
 		function $run(src){
 			
-			var main = new Module("main",src);
-			main.exec();
-			
+			var id 	= $x.libId(src);
+				var src = src.indexOf(".js")!= -1 ? src : (src+".js");
+			var module = $x.get(id);
+				
+				module.exec();
+				
 			
 		}
 
@@ -246,6 +290,7 @@
 
 		window.$import = $import;
 		window.def = def;
+		window.def0 = def0;
 		$x.$run = $run;
 
 
