@@ -1,11 +1,11 @@
 
 
-def0("a",function(){		
+def("a",function(){		
 
 		$x.a ="123456";
 
 });	
-def0("b",function(){
+def("b",function(){
 
 	$import("a.js"); 
 
@@ -27,9 +27,9 @@ def0("b",function(){
 
 });	
 
-def0("c",function(){
+def("c",function(){
 
-	$import(["b.js","a.js","c.js"]);
+	$import(["b.js","a.js","c"]);
 	var user = new $x.User();
 	console.log(user);
 

@@ -1,6 +1,6 @@
 def(function(){
 
-	$import(["b.js","a.js","c.js"]);
+	$import(["b.js","a.js"]);
 
 	var user = new $x.User();
 

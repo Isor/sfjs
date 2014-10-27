@@ -141,10 +141,14 @@
 					script.type="text/javascript";
 					script.async=true;
 					script.src=this.src;		
-					script.onload=function(){					
+					script.onload=function(){
+					//	if(!$x.eax_func){ return ;}					
 						self.func = $x.eax_func;
+					//	$x.eax_func = null ;
 						self.status = STATUS.LOADED;
 						self.emit(EVENTS.LOADED);
+
+
 					}				 
 					document.getElementsByTagName("HEAD")[0].appendChild(script);
 			},
@@ -175,11 +179,14 @@
 					 	 	if(modules[i].id  != this.id ){	 // 屏蔽对自己的依赖
 					 	 		self.afterExec(modules[i]);
 					 	 		deps.push(modules[i]);
+					 	 	}else{
+					 	 		throw "It can deps by self. at "+this.id+"";
 					 	 	}
 					 	 }
 					 	 for(var i = 0 ; i< deps.length; i++){
-					 	 	modules[i].exec();
-					 	 }
+						 	 	deps[i].exec();
+						 }
+
 
 
 					 }else{
@@ -225,12 +232,7 @@
 			this.modules = $x.isArray(modules) ? modules : [modules];
 		}
 
-		function def(func){
-
-				$x.eax_func = func;
-
-		}
-
+		
 		/*
 			<模块入口函数>
 			1 id代表模块的唯一标识, 在通常的开发模式下只需要如下定义代码即可:
@@ -240,18 +242,31 @@
 			
 
 		*/
-		function def1(id,method){
+		function def(id,func){
 			 /*
 			 	 to adpater def(function(){....})
 			 */
 			 if($x.isFunc(id)){ 
 			 	id = null;
-			 	method = id;
+			 	func = id;
+			 }
+			 if(!($x.isStr(id) && $x.isFunc(func))){
+			 	throw "the id must  be a string and method must be a function .\n"
+			 			+"Is you want to is :def(function(){ ... }) ";
 			 }
 
+			  if(id == null){
+			 		$x.eax_func = func;
+			 }else{
+			 		def0(id,func);
+			 }
+			
+
 		}
-		function def0(src,func){
-				var meta = module_meta(src);
+		function def0(id,func){
+
+				var meta = module_meta(id);
+				
 				var id = meta.id, src = meta.src;
 				if($x.CACHE[id]){
 					throw "the lib#"+id+" has exists. please check it.";
@@ -287,9 +302,8 @@
 
 		function $run(src){
 			
-			var id 	= $x.libId(src);
-				var src = src.indexOf(".js")!= -1 ? src : (src+".js");
-			var module = $x.get(id);
+			var meta = module_meta(src);
+			var module = $x.get(meta.id);
 				
 				module.exec();
 				
@@ -300,7 +314,7 @@
 
 		window.$import = $import;
 		window.def = def;
-		window.def0 = def0;
+		
 		$x.$run = $run;
 
 
