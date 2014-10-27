@@ -1,16 +1,3 @@
-/*
-	描述: 1  一个自己实现的js模块加载程序, 虽然有seajs, rjs , nodejs等指明品牌 . 用的感觉不舒服
-		  所以打算自己实现一个.
-		  2  我不是很喜欢 seajs,rjs 等中的要求带入参数的写法, 希望定义模块可以尽可能的自由随性.
-		  3  在依赖判断上面使用了有别于seajs的判断方式, 通过“exception-catch-rerun”的方式实现对
-		  	 依赖的加载和执行
-		  4  现阶段兼容性和稳定性还没有加以考虑, 但我会持续改进
-
-		  5	 当然在js文件路径判断上面也存在非常大的bug (现价段压根就没有做路径处理).
-
-		  6	 在事件依赖上面,目前的处理也很糟糕(为了尽快写出马虎处理了), 在方面的测试会在 sf-event.js
-		  	 中学习尝试.
-*/
 (function(){
 		var $_tos= Object.prototype.toString ;
 		var $x = window.$x = {
@@ -38,6 +25,64 @@
 		/* 模块状态 : 存在错误, 未加载, 加载中, 已加载, 已执行 */
 		var STATUS ={ ERROR:0, UNLOAD:1, LOADING:2,LOADED:3 ,EXECUTED:4};
 		var EVENTS ={ LOADED :"0", EXECUTED:"1"}; 
+
+		/*  事件对象 */
+
+		function Entity(func,num){
+			this.func = func;
+			this.num =  (num === undefined) ? -1 : num ;
+			this.time = new Date();
+			this.isExpired= function(){
+				return this.num == 0;
+			}
+			this.exec =function(){
+				if(!this.isExpired()){
+					func.call();
+					if(this.num > 0){
+						this.num -= 1;
+					}
+				}
+			}
+		}
+
+		function Event(){		
+			this.eventSource=[];
+		}
+		Event.prototype ={
+			on:function(key,func,num){				
+				if(!$x.isFunc(func)) { throw "func not a  function" ;}
+				var ls = this.eventSource[key] || (this.eventSource[key]=[]);
+					ls.push(new Entity(func,num));
+			},
+			fire:function(key){
+				var ls = this.eventSource[key] || [];				
+				for(var i = 0 ; i<ls.length; i++ ){
+					 console.log(ls[i]);
+					 var entity = ls[i];
+						 entity.exec();
+				} 
+				this.flush();
+			},
+			one:function(key,func){
+				this.on(key,func,1);
+			},
+			flush:function(key){
+				var ls = this.eventSource[key] || [];
+				var survivors = [];
+				for(var i =0 ; i < ls.length;  i++ ){
+					var entity = ls[i];
+					if(!entity.isExpired()){
+						survivors.push(entity);
+					}
+				}
+				this.eventSource[key] = survivors;
+			}
+						
+		}
+
+
+
+
 		/* 模块 */
 		function Module(id,src){
 			this.id = id; 
@@ -52,8 +97,7 @@
 		Module.prototype ={
 
 			load:function(callback){ // for some reason , it just invock by self.
-				var self = this;		
-					
+				var self = this;					
 				this.on(EVENTS.LOADED,callback);				
 				if(this.status >= STATUS.LOADING){ return ;}
 				this.status = STATUS.LOADING;
@@ -133,17 +177,24 @@
 
 
 		}
+		/*
+		   模块依赖异常
+		*/
 
 		function ModuleDepException(modules){
 			this.modules = $x.isArray(modules) ? modules : [modules];
 		}
-
+		/*
+			模块定义函数
+		*/
 		function def(func){
 
 				$x.eax_func = func;
 
 		}
-
+		/*
+		  模块导入入口函数
+		*/
 		function $import(src){
 			
 			var deps = $x.isArray(src)  ? src : [src];

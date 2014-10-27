@@ -30,28 +30,23 @@
 			}
 		}
 	}
-	function Event(){
-	
+	function Event(){	
 		this.eventSource=[];
 	}
 	Event.prototype ={
-		on:function(key,func,num){
-			
+		on:function(key,func,num){			
 			if(!$x.isFunc(func)) { throw "func not a  function" ;}
 			var ls = this.eventSource[key] || (this.eventSource[key]=[]);
 				ls.push(new Entity(func,num));
 		},
 		fire:function(key){
 			console.log(this.eventSource)
-			var ls = this.eventSource[key] || [];
-			
+			var ls = this.eventSource[key] || [];			
 			for(var i = 0 ; i<ls.length; i++ ){
-				console.log(ls[i]);
 				 var entity = ls[i];
 					 entity.exec();
 			} 
-			this.flush();
-			
+			this.flush();			
 		},
 		one:function(key,func){
 			this.on(key,func,1);
@@ -70,70 +65,46 @@
 					
 	}
 
+
 	/*  test  */
 
 		
 		function Task(name){
-			this.name=name;
-			var e = new Event();
-			this.deps = {num:0, _:[]};
-
-			this.on =function (key, func){
-				e.one(key,func);
-			};
-			this.emit=function(key){
-				e.fire(key);
-			};
-			this.exec = function(){
-				console.log("exec "+ this.name +" begin");
-				if(this.deps.num > 0){
-					for(var i = 0; i < this.deps._.length; i++){
-						this.deps._[i].exec();
-					}
-					return ;
-				}
-				
-				console.log("exec "+this.name +" end");
-				this.emit("exec");
-			};
-			this.after=function(task){
-				var self = this;
-				this.deps.num += 1;
-				this.deps._.push(task);				
-				task.on("exec",function(){
-					console.log(self);
-					self.deps.num --;
-					if(self.deps.num == 0){
-						self.exec();
-					}
-				});
-				return this;
-			};
-			
-
-
+			this.name = name;
+			this.e = new Event();
+		}
+		Task.prototype = {
+			exec:function(){
+				console.log(this.name);
+			},
+			on:function(key,func){
+				this.e.one(key,func);
+			},
+			emit:function(key){
+				this.e.fire(key);
+			}
 		}
 		
-		function DSLTask(mainTask){
-			 this.dependsOn = {num:0 , _:[];
-			 this.task =task;
+		function DSL(mainTask){
+			 this.dependsOn = {num:0 , _:[]};
+			 this.task =mainTask;
 			 this.isFinish =false;
-			 this.id = mainTask._id ||  mainTask._id= new Date().getTime(); 
+			 this.id = mainTask._id ||  (mainTask._id= new Date().getTime()); 
 		}
-		DSLTask.prototype={
+		DSL.prototype={
 			 cache:{ },
 			 get:function(task){
 			 	 var  existDslTask = this.cache[task.id];
 			 	 if(!existDslTask){
-					 existDslTask = this.cache[task.id] = new DSLTask(task);
+					 existDslTask = this.cache[task.id] = new DSL(task);
 			 	 }
 			 	 return existDslTask;
-			 }
+			 },
 			 run:function(){
-			 	var self = this , dependsOn = this.dependsOn;
-			 	if(dependsOn.num > 0){
-			 		for( var i = 0 ; i < dependsOn.num ; i++){
-			 			dependsOn[i].on("exec",function(){
+			 	var self = this , dependsOn = this.dependsOn._;
+			 	if(dependsOn.length > 0){
+			 		for( var i = 0 ; i < dependsOn.length ; i++){
+			 			dependsOn[i].task.on("exec",function(){
 			 				  self.dependsOn.num -- ; 
 			 				  if(self.dependsOn.num == 0){
 			 				  	  self.task.exec();
@@ -141,34 +112,41 @@
 			 			});	
 			 			dependsOn[i].run();
 			 		}
+			 	}else{
+			 		this.task.exec();
 			 	}
 
 			 },
-			 after:function(task){
-			 	   this.dependsOn.push(new DSLTask(tas))
+			 after:function(dsl){
+			 	   this.dependsOn._.push(dsl);
+			 	   return this;
 			 },
 			 before:function(task){
 
 			 }
-		}
+		};
 
 
 
-	var  t1 = new Task(1);
-	var  t2 = new Task(2);
-	var  t3 = new Task(3);
-	var  t4 = new Task(4);
-	var  main = new Task("Main");
- 	main.after(t4).after(t3);
- //	t3.after(t2).after(t1);
+	var d1 = new DSL(new Task(1));
+	var d2 = new DSL(new Task(2));
+	var d3 = new DSL(new Task(3));
+	
+	var d4 = new DSL(new Task(4));
+	
+	
 
- 	main.exec();
+	var  main = new DSL(new Task("main")).after(d4).after(d1);
+		d4.after(d3).after(d2);
 
- 	console.log(main);
+		main.run();
 
 
 
 
-	/*  test */
+
+
+
+
 
 })();
