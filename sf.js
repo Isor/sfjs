@@ -230,6 +230,26 @@
 				$x.eax_func = func;
 
 		}
+
+		/*
+			<模块入口函数>
+			1 id代表模块的唯一标识, 在通常的开发模式下只需要如下定义代码即可:
+				def(function($x){ .... })
+			  在此情况下加载器使用js文件的相对全路径作为id标识,http://demo/js/a.js对应id为js/a.
+			2 当只有一个method参数时, 其id值初始化会延迟到js加载完成.(针对js兼容性问题暂时不考虑)
+			
+
+		*/
+		function def1(id,method){
+			 /*
+			 	 to adpater def(function(){....})
+			 */
+			 if($x.isFunc(id)){ 
+			 	id = null;
+			 	method = id;
+			 }
+
+		}
 		function def0(src,func){
 				var meta = module_meta(src);
 				var id = meta.id, src = meta.src;
