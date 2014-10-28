@@ -34,6 +34,7 @@
 
 
 
+
 				CACHE: {},
 				root : "" 			
 		}; 
@@ -119,6 +120,7 @@
 		/* 模块 */
 		function Module(id,src,func){
 
+			if(func) { func.module = this } // 记录func 和module 的对应关系
 			this.id = id; 
 			this.src =src;
 			this.func = func || null;
@@ -126,6 +128,8 @@
 			this.depsnum = 0;
 			this.eventbus =  new Event();
 			this._deps = []; 
+
+
 		}
 		
 		
@@ -166,6 +170,7 @@
 					return;
 				}
 				try{
+					
 					 this.func.call($x,$x);	
 
 					 this.status = STATUS.EXECUTED;
@@ -180,7 +185,7 @@
 					 	 		self.afterExec(modules[i]);
 					 	 		deps.push(modules[i]);
 					 	 	}else{
-					 	 		throw "It can deps by self. at "+this.id+"";
+					 	 		throw "Self-reliance #"+this.id;
 					 	 	}
 					 	 }
 					 	 for(var i = 0 ; i< deps.length; i++){
@@ -251,8 +256,7 @@
 			 	func = id;
 			 }
 			 if(!($x.isStr(id) && $x.isFunc(func))){
-			 	throw "the id must  be a string and method must be a function .\n"
-			 			+"Is you want to is :def(function(){ ... }) ";
+			 	throw "unexpected arguments ...";
 			 }
 
 			  if(id == null){
@@ -265,14 +269,15 @@
 		}
 		function def0(id,func){
 
-				var meta = module_meta(id);
-				
+				var meta = module_meta(id);				
 				var id = meta.id, src = meta.src;
+
 				if($x.CACHE[id]){
-					throw "the lib#"+id+" has exists. please check it.";
+					throw "ERROR : duplicate definition  module#"+ id +" has exist";
 				}
 				var newModule  = new Module(id, src,func);
 					newModule.status = STATUS.LOADED;
+
 				$x.CACHE[id] = newModule;
 		}
 
@@ -287,9 +292,11 @@
 
 			var unExecedDepsModule = [] ;
 			for(var i = 0 ; i < deps.length ; i++){
-				var module = $x.get(deps[i]);
-				
-				if(module.status < STATUS.EXECUTED){
+				var module = $x.get(deps[i]);	
+				/*
+					{@code $import.caller.module != module } 排除直接自依赖
+				*/			
+				if(module.status < STATUS.EXECUTED  && $import.caller.module != module ){				
 					unExecedDepsModule.push(module);
 				}
 			}
