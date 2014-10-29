@@ -1,8 +1,10 @@
 /*
 	One by One to implements a js loader by self.
 */
+var console = window.console || {log:function(mess){}};
 (function(){
 		var $_tos= Object.prototype.toString ;
+		var  head = document.getElementsByTagName("HEAD")[0];
 		var $x = window.$x = {
 				isFunc:function(obj){
 					return $_tos.call(obj) === "[object Function]";
@@ -31,15 +33,78 @@
 						}
 						return src;
 				},
+				current_exception:false,
 
-
+				eax_func:[],
 
 
 				CACHE: {},
 				root : "" 			
-		}; 
+		};
+
+function def0(id,func){
+
+				var meta = module_meta(id);				
+				var id = meta.id, src = meta.src;
+
+				if($x.CACHE[id]){
+					throw "ERROR : duplicate definition  module#"+ id +" has exist";
+				}
+				var newModule  = new Module(id, src,func);
+					newModule.status = STATUS.LOADED;
+
+				$x.CACHE[id] = newModule;
+		}
+
+		function $import(src){
+			if(arguments.length == 0){ return;}
+			var src = $x.isArray(src)  ? src : [src];
+			var deps= [];
+			for(var i = 0 ; i< src.length; i ++){
+				var meta = module_meta(src[i]);
+				deps.push(meta.id);
+			}
+
+			var unExecedDepsModule = [] ;
+			for(var i = 0 ; i < deps.length ; i++){
+				var module = $x.get(deps[i]);	
+				/*
+					{@code $import.caller.module != module } 排除直接自依赖
+				*/			
+				if(module.status < STATUS.EXECUTED  && $import.caller.module != module ){				
+					unExecedDepsModule.push(module);
+				}
+			}
+			
+			if(unExecedDepsModule.length > 0){
+				$x.current_exception =new ModuleDepException(unExecedDepsModule);
+				throw new ModuleDepException(unExecedDepsModule);
+			
+			
+			
+			}
+
+		}		
+		
+		
+		function $run(src){
+			
+			var meta = module_meta(src);
+			var module = $x.get(meta.id);
+				
+				module.exec();
+				
+			
+		}
 
 
+
+		window.$import = $import;
+		window.def = def;
+		
+		$x.$run = $run;
+
+		
 		/*事件Event 对象 */
 
 		function Entity(func,num){
@@ -72,11 +137,11 @@
 				ls.push(new Entity(func,num));
 		},
 		fire:function(key){
-			console.log(this.eventSource)
+
 			var ls = this.eventSource[key] || [];
 			
 			for(var i = 0 ; i<ls.length; i++ ){
-				//console.log(ls[i]);
+			
 				 var entity = ls[i];
 					 entity.exec();
 			} 
@@ -141,20 +206,57 @@
 				this.on(EVENTS.LOADED,callback);				
 				if(this.status >= STATUS.LOADING){ return ;}
 				this.status = STATUS.LOADING;
+
 				var script = document.createElement("SCRIPT");
 					script.type="text/javascript";
 					script.async=true;
-					script.src=this.src;		
-					script.onload=function(){
-					//	if(!$x.eax_func){ return ;}					
-						self.func = $x.eax_func;
-					//	$x.eax_func = null ;
-						self.status = STATUS.LOADED;
-						self.emit(EVENTS.LOADED);
+					var isIe =  "readyState" in script; 
+					
 
+					if(isIe){
 
-					}				 
-					document.getElementsByTagName("HEAD")[0].appendChild(script);
+							  script.onreadystatechange = function() {
+	        						if (/loaded|complete/.test(script.readyState)) {
+	         						 	
+	       								 onScriptLoadCallback();
+
+	     							}
+     						 } 
+
+					}else {
+
+						script.onload = function(){
+								if($x.eax_func.length == 0 ){
+									throw "-------------------";
+								}
+								self.func =$x.eax_func.shift();
+								console.log("---------------"+self.id+"--------------"+self.func.toString());
+								 
+								self.status = STATUS.LOADED;
+								self.emit(EVENTS.LOADED);
+
+						}	
+					}
+					script.src=this.src;
+					
+						head.insertBefore(script, head.firstChild);
+
+					function onScriptLoadCallback(){
+								script.onload = script.onreadystatechange = script.onerror = null;
+
+								if($x.eax_func.length == 0 ){
+									throw "-------------------";
+								}
+								self.func =$x.eax_func.shift();
+								console.log("---------------"+self.id+"--------------"+$x.eax_func.toString());
+								if($x.eax_func == null ){
+									throw "error ";
+								}
+							
+								self.status = STATUS.LOADED;
+								self.emit(EVENTS.LOADED);
+								script = null;
+					}
 			},
 
 			exec:function(){
@@ -169,15 +271,19 @@
 					//this.emit(EVENTS.EXECUTED);
 					return;
 				}
-				try{
-					
+				
+				try{					
+					 if(!this.func.module) { this.func.module = this;}
 					 this.func.call($x,$x);	
-
 					 this.status = STATUS.EXECUTED;
 					 this.emit(EVENTS.EXECUTED);
 				}catch(e){
-				
+						if($x.current_exception) {
+							e = $x.current_exception;
+							$x.current_exception = false;
+						}
 					 if(e instanceof ModuleDepException){
+					   
 					 	 var modules = e.modules;
 					 	 var deps = [] ; 
 					 	 for(var i = 0 ; i< modules.length; i++){	
@@ -195,8 +301,11 @@
 
 
 					 }else{
-					 	throw e;
+					 
+						throw e
+						
 					 }
+					 
 
 				}
 				
@@ -226,7 +335,7 @@
 				this.eventbus.one(key,func);
 			},
 			emit:function(key){
-				console.log( this.id);
+				console.log( this.id +"  -- >" + key);
 				this.eventbus.fire(key);
 			}	
 
@@ -235,6 +344,10 @@
 
 		function ModuleDepException(modules){
 			this.modules = $x.isArray(modules) ? modules : [modules];
+			this.message="A --  B";
+			this.toString=function (){
+				return "MDE";
+			}
 		}
 
 		
@@ -251,80 +364,29 @@
 			 /*
 			 	 to adpater def(function(){....})
 			 */
+			 console.log("----------++++++++++++++++++++++++++++++++--------");
+	
+
 			 if($x.isFunc(id)){ 
-			 	id = null;
 			 	func = id;
+			 	id = null;			 	
+			 	$x.eax_func.push(func);
+			 	return ;
 			 }
 			 if(!($x.isStr(id) && $x.isFunc(func))){
 			 	throw "unexpected arguments ...";
 			 }
 
-			  if(id == null){
-			 		$x.eax_func = func;
-			 }else{
-			 		def0(id,func);
-			 }
+			 def0(id,func);		
 			
 
 		}
-		function def0(id,func){
-
-				var meta = module_meta(id);				
-				var id = meta.id, src = meta.src;
-
-				if($x.CACHE[id]){
-					throw "ERROR : duplicate definition  module#"+ id +" has exist";
-				}
-				var newModule  = new Module(id, src,func);
-					newModule.status = STATUS.LOADED;
-
-				$x.CACHE[id] = newModule;
-		}
-
-		function $import(src){
-			
-			var src = $x.isArray(src)  ? src : [src];
-			var deps= [];
-			for(var i = 0 ; i< src.length; i ++){
-				var meta = module_meta(src[i]);
-				deps.push(meta.id);
-			}
-
-			var unExecedDepsModule = [] ;
-			for(var i = 0 ; i < deps.length ; i++){
-				var module = $x.get(deps[i]);	
-				/*
-					{@code $import.caller.module != module } 排除直接自依赖
-				*/			
-				if(module.status < STATUS.EXECUTED  && $import.caller.module != module ){				
-					unExecedDepsModule.push(module);
-				}
-			}
-			
-			if(unExecedDepsModule.length > 0){
-				throw new ModuleDepException(unExecedDepsModule);
-			}
-
-		}
-
-		function $run(src){
-			
-			var meta = module_meta(src);
-			var module = $x.get(meta.id);
-				
-				module.exec();
-				
-			
-		}
-
-
-
-		window.$import = $import;
-		window.def = def;
 		
-		$x.$run = $run;
+	
 
 
 
+
+		
 
 })();

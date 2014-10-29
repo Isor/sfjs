@@ -1,8 +1,8 @@
 def(function(){
 
-	$import("a.js");	
+	$import("a.js");
 
-	console.log("$x.a = "+$x.a +" from a.js");
+		console.log("-----------------b");
 
 	var User = this.User = function(){
 			var name = "zm";
@@ -12,10 +12,7 @@ def(function(){
 		toString:function(){
 			return "User#{name:zm,age:24}";
 		}
-
 	};
 
-
-	
 
 });
